@@ -11,7 +11,7 @@ BEGIN {
 
   @ISA = qw(DynaLoader);
 
-  $VERSION = '0.01';
+  $VERSION = '0.02';
 
   bootstrap Audio::FindChunks $VERSION;
 }
@@ -118,7 +118,7 @@ my %defaults = (
     channels => 2,
     sizedata => MY_INF,
     out_fh => \*STDOUT,
-    preprocess => {mp3 => [[qw(lame --decode)], []]}, # Second contains extra args to read stdin
+    preprocess => {mp3 => [[qw(lame --silent --decode)], [], ['-']]}, # Second contains extra args to read stdin
   # For getting RMS info
     sec_per_chunk => 0.1,
   # RMS cache
@@ -172,14 +172,17 @@ my %filters = (
 		     return 'filehandle' unless defined $f;
 		     $f =~ s/\.(\w+)$// if shift;
 		     $f }, 'filename', 'stem_strip_extension'],
-  input_type => [sub { return unless defined (my $f = shift);
-		       return unless $f =~ /\.(\w+)$/;
-		       $1 }, 'filename'],
+  input_type => [sub {	return unless defined (my $f = shift);
+			return unless $f =~ /\.(\w+)$/;
+			my $h = shift;
+			return lc $1 if not $h->{$1} and $h->{lc $1};
+			$1 }, 'filename', 'preprocess'],
   preprocess_a => [sub {return unless defined $_[0];
 			$_[1]->{$_[0]} }, 'input_type', 'preprocess'],
   preprocess_input => [sub { my ($cmd, $f) = @_; return unless $cmd;
-			     return [@{$cmd->[0]}, $f] if defined $f;
-			     return [@{$cmd->[0]}, @{$cmd->[1]}];
+			     return [@{$cmd->[0]}, $f, @{$cmd->[2]}]
+				if defined $f;
+			     return [@{$cmd->[0]}, @{$cmd->[1]}, @{$cmd->[2]}];
 		       }, 'preprocess_a', 'filename'],
   fh_bin => [sub { my $fh = shift; binmode $fh; $fh }, 'fh'],
   out_fh_bin => [sub {	return unless shift;
@@ -366,7 +369,7 @@ my %recipes = (
   map( ($_ => {default => undef}),
 	@recognized),
   map(($_ => {filter => $filters{$_}}), keys %filters),
-  map(($_ => {prerequisites => ['rms_data']}), 'chunks'),
+  map(($_ => {prerequisites => ['rms_data']}), 'chunks', 'min', 'max'),
   fh => {self_filter =>
 	 [sub {	my ($self, $cmd) = (shift, shift); local *FH;
 		if ($cmd) { $cmd = '"' . join('" "', @$cmd) . '"';
@@ -412,15 +415,16 @@ sub read_averages ($) {
 
   my $read = $self->get('bytes_per_chunk') - $off;
   my $rem = $self->get('sizedata');
-  defined (my $cnt = sysread $fh, $buf, $read, $off)
+  $rem = MY_INF if $rem == 0x7fffffff;		# Lame puts this sometimes...
+  defined (my $cnt = read $fh, $buf, $read, $off)
     or die "Error reading the first chunk: $!";
   syswrite $out_fh, $buf or die "Error duping output: $!"
     if $out_fh;
   $rem -= $cnt;
   die "short read" unless $rem <= 0 or $rem == MY_INF or $cnt == $read;
   my @d = '';
-  my ($c, $b_p_s, $channels, $subchunk) =
-    (0, map $self->get($_), 'bytes_per_sample', 'channels', 'subchunk_size');
+  my ($c, $b_p_s, $channels, $subchunk, $b_p_c) =
+    (0, map $self->get($_), qw(bytes_per_sample channels subchunk_size bytes_per_chunk));
   while (1) {
     my $p = le_short_sample_multichannel($b_p_s, 2, $channels, \@stats,
 					 $subchunk, $buf)  or last;
@@ -434,10 +438,10 @@ sub read_averages ($) {
     $c++;
     #warn "avg = ", $sum_square / $p / @stats;
     last unless $rem;
-    defined ($cnt = sysread $fh, $buf, $self->get('bytes_per_chunk'))
+    defined ($cnt = read $fh, $buf, $b_p_c)
       or die "Error reading: $!";
     $rem -= $cnt;
-    die "short read" unless $rem <= 0 or $rem == MY_INF or $cnt == $read;
+    die "short read: rem=$rem, cnt=$cnt, b_p_c=$b_p_c" unless $rem <= 0 or $rem == MY_INF or $cnt == $b_p_c;
     syswrite $out_fh, $buf or die "Error duping output: $!"
       if $cnt and $out_fh;
     last unless $cnt;
@@ -495,16 +499,20 @@ sub output_level ($$;$) {
 sub output_levels ($;$) {
   my ($self, $what) = (shift, shift);
   $what ||= 'rms_data';			# 1-element array with a 'd'-packed elt
-  my ($opts,$o);
+  my ($opts,$o) = {};
   for $o ($what, qw(frequency bytes_per_sample channels sec_per_chunk
-		    bytes_per_chunk min max)) {
+		    bytes_per_chunk)) {
     $opts->{$o} = $self->get($o);
+  }
+  for $o (qw(min max)) {	# Not available from RMS cache
+    eval { $opts->{$o} = $self->get($o) };
   }
   print <<EOP;
 Frequency: $opts->{frequency}.  Stride: $opts->{bytes_per_sample}; $opts->{channels} channels.
 Chunk=$opts->{sec_per_chunk}sec=$opts->{bytes_per_chunk}bytes.
 EOP
   for my $c (0..$opts->{channels}-1) {
+    next unless $opts->{min};
     print "\t" if $c;
     my @l = map $opts->{$_}[$c], 'min', 'max';
     my @db = map 20*log(abs($_)/(1<<15))/log(10), @l;
@@ -521,8 +529,25 @@ sub output_blocks ($;$) {
   my $l = $self->get('sec_per_chunk');
   printf "threshold: %s (in %s .. %s)\n",
     map $self->get($_),	qw(threshold threshold_min threshold_max);
-  printf "start %s; duration %s\n", $_->[1] * $l, $_->[2] * $l
-    for grep $_->[0] > 0, @$blocks;
+  my ($gap, $b) = 0;
+  for $b (@$blocks) {
+    $gap = $b->[2] * $l, next if $b->[0] < 0;
+    printf "start %s; duration %s; gap %s (%s .. %s; %s)\n",
+      $b->[1] * $l, $b->[2] * $l, $gap,
+	format_hms($b->[1] * $l), format_hms(($b->[1] + $b->[2]) * $l), format_hms($b->[2] * $l);
+  }
+}
+
+sub split_file ($;$$$) {
+  my ($self, $name_cb, $finish_cb) = (shift, shift, shift);
+  my $blocks = $self->get(shift || 'b');
+  my $t = $self->get('input_type');
+  die "Only MP3 split supported" unless $t and $t eq 'mp3';
+  my $l = $self->get('sec_per_chunk');
+  my @req = map [$_->[1] * $l, $_->[2] * $l], grep $_->[0] > 0, @$blocks
+    or return;
+  require MP3::Splitter;
+  MP3::Splitter::mp3split($self->get('filename'), @req);
 }
 
 sub new {
@@ -581,7 +606,7 @@ The following configuration settings (and defaults) are supported:
     sizedata => MY_INF,		# likewise (how many bytes of PCM to read)
     out_fh => \*STDOUT,		# mirror WAV/PCM to this FH if 'filter'
   # Process non-WAV data:
-    preprocess => {mp3 => [[qw(lame --decode)], []]}, # Second contains extra args to read stdin
+    preprocess => {mp3 => [[qw(lame --silent --decode)], [], ['-']]}, # Second contains extra args to read stdin
   # RMS cache (used if 'valid_rms')
     rms_extension => '.rms',	# Appended to the 'filestem'
   # Averaging to RMS info
@@ -670,6 +695,12 @@ C<rms_data>; additional possible values are C<medians> and C<sorted>.
 
 prints a human-readable display of obtained audio chunks.  Defaults to
 C<b>; additional possible values are C<b0> to C<b4>.
+
+=item C<split_file([name_handler], [finish_hanlder], [key])>
+
+Splits the file (only MP3 via L<MP3::Splitter> is supported now).  The
+meaning of optional handlers is the same as for L<MP3::Splitter>.  Defaults to
+blocks of type C<b>; additional possible values are C<b0> to C<b4>.
 
 =item @vals = get_rmsinfo(); set_rmsinfo(@vals)
 

@@ -4,3 +4,9 @@ Revision history for Perl extension Audio::FindChunks.
 	- original version; created by h2xs 1.23 with options
 		-b 5.5.3 -Afn Audio::FindChunks -x wavestats
 
+0.02	The lame reader was faulty; add --silent and an extra '-'.
+	Reading from a pipe would fail (such as for MP3) due to sysread vs read
+	Detection of a short read was wrong too...
+	Allow caseless match of file types...
+	Test that output_blocks(), output_levels() do not die too...
+	Add mp3 split via MP3::Splitter.

@@ -7,7 +7,7 @@
 # change 'tests => 1' to 'tests => last_test_to_print';
 
 use Test;
-BEGIN { plan tests => 14 };
+BEGIN { plan tests => 16 };
 use Audio::FindChunks;
 ok(1); # If we made it this far, we're ok.
 
@@ -86,5 +86,17 @@ EOT
 for my $q (0..$#ques) {
   ok (str($ques[$q]), $ans[$q], "field $ques[$q]");
 }
+
+open OUT, '>blocks.tmp' or warn;
+my $old = select OUT;
+
+$h->output_blocks();
+ok(1, 1, 'output_blocks()');
+
+$h->output_levels();
+ok(1, 1, 'output_levels()');
+
+select $old;
+close OUT or warn;
 
 -f 'tmp.wav' and (unlink 'tmp.wav' or warn "unlink: $!");
