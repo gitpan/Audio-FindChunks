@@ -1,0 +1,6 @@
+Revision history for Perl extension Audio::FindChunks.
+
+0.01  Fri Feb 20 16:03:06 2004
+	- original version; created by h2xs 1.23 with options
+		-b 5.5.3 -Afn Audio::FindChunks -x wavestats
+

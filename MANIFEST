@@ -1,0 +1,13 @@
+Changes
+FindChunks.xs
+Makefile.PL
+MANIFEST
+ppport.h
+README
+typemap
+t/Audio-FindChunks.t
+FindChunks.pm
+wavestats.c
+wavestats.h
+META.yml                                 Module meta-data (added by MakeMaker)
+TODO
