@@ -11,7 +11,7 @@ BEGIN {
 
   @ISA = qw(DynaLoader);
 
-  $VERSION = '0.02';
+  $VERSION = '0.03';
 
   bootstrap Audio::FindChunks $VERSION;
 }
@@ -147,20 +147,23 @@ my %defaults = (
     local_threshold_factor => 1.05,
     extend_track_end_sec => 0.5,
     extend_track_begin_sec => 0.3,
+    min_boundary_silence_sec => 0.2,
+  );
+
+my %mirror_from = (	# May be set separately, otherwise are synonims
+    min_actual_silence_sec => 'min_silence_sec',
+    min_start_silence_sec => 'min_boundary_silence_sec',
+    min_end_silence_sec => 'min_boundary_silence_sec',
+    cache_rms_write => 'cache_rms',
+    cache_rms_read => 'cache_rms',
+    min_silence_chunks_merge => 'min_silence_chunks',
   );
 
 my %chunk_times =
   map {	(my $n = $_) =~ s/_sec/_chunks/;
 	($n => {filter
 		=> [sub {rnd(shift()/shift)}, $_, 'sec_per_chunk']}) }
-    'min_actual_silence_sec', grep /_sec$/, keys %defaults;
-
-my %mirror_from = (	# May be set separately, otherwise are synonims
-    min_actual_silence_sec => 'min_silence_sec',
-    cache_rms_write => 'cache_rms',
-    cache_rms_read => 'cache_rms',
-    min_silence_chunks_merge => 'min_silence_chunks',
-  );
+    grep /_sec$/, keys %defaults, keys %mirror_from;
 
 my @recognized =	# these default to undef, but accessing them is not fatal
   qw(filename stem_strip_extension filter raw_pcm rms_filename close_fh
@@ -310,7 +313,8 @@ my %filters = (
   b => [sub {	my @b = map [@$_], @{shift()};	# Deep copy
 		my ($ign_pre, $ign_pre_rel, $ign_post, $ign_post_rel) = (shift, shift, shift, shift);
 		my ($meds, $thres_factor) = (shift, shift);
-		my ($ext_beg, $ext_end, $min_silence) = (shift, shift, shift);
+		my ($ext_beg, $ext_end) = (shift, shift);
+		my ($min_silence, $min_silence_s, $min_silence_e) = (shift, shift, shift);
 		my $c = -1;
 		for my $b (@b) {
 		  ++$c;
@@ -353,13 +357,16 @@ my %filters = (
 		    $b[$c+1]->[1] -= $e_ini - $e;
 		    $b->[2] -= $e_ini - $e;
 		  }
-		  $b->[0] = SOUND if $b->[2] < $min_silence;
+		  my $min_sil = ($c == 0 ? $min_silence_s :
+				 ($c == $#b ? $min_silence_e : $min_silence));
+		  $b->[0] = SOUND if $b->[2] < $min_sil;
 		} # After ignoring short silence, need to merge similar blocks
 		merge_blocks \@b
 	 }, 'b4', 'local_level_ignore_pre_chunks', 'local_level_ignore_pre_rel',
 	 'local_level_ignore_post_chunks', 'local_level_ignore_post_rel',
 	 'medians', 'local_threshold_factor', 'extend_track_begin_chunks',
-	 'extend_track_end_chunks', 'min_actual_silence_chunks'],
+	 'extend_track_end_chunks', 'min_actual_silence_chunks',
+         'min_start_silence_chunks', 'min_end_silence_chunks'],
   );
 
 my %recipes = (
@@ -521,25 +528,41 @@ EOP
   print "\n";
   my $n = 0;
   output_level($n++, $opts->{sec_per_chunk}, $_) for unpack 'd*', $opts->{$what}[0];
+  $self;
 }
 
 sub output_blocks ($;$) {
   my $self = shift;
-  my $blocks = $self->get(shift || 'b');
+  my $opts = shift;
+  my $type = 'b';
+  if ($opts and not ref $opts) {
+    $type = $opts;
+    $opts = {};
+  }
+  $opts ||= {};
+  my %opts = (format => 'long', %$opts);
+  my $blocks = $self->get(shift || $type);
   my $l = $self->get('sec_per_chunk');
-  printf "threshold: %s (in %s .. %s)\n",
-    map $self->get($_),	qw(threshold threshold_min threshold_max);
-  my ($gap, $b) = 0;
+  printf "# threshold: %s (in %s .. %s)\n",
+    map $self->get($_),	qw(threshold threshold_min threshold_max)
+      if $opts{format} eq 'long';
+  my ($gap, $c, $b) = (0, 0);
   for $b (@$blocks) {
     $gap = $b->[2] * $l, next if $b->[0] < 0;
-    printf "start %s; duration %s; gap %s (%s .. %s; %s)\n",
-      $b->[1] * $l, $b->[2] * $l, $gap,
+    printf("%s\t=%s\t# %s len=%s\n",
+	   $b->[1] * $l, ($b->[1] + $b->[2]) * $l, ++$c, $b->[2] * $l), next
+	if $opts{format} eq 'short';
+    printf "%s\t=%s\t# n=%s duration %s; gap %s (%s .. %s; %s)\n",
+      $b->[1] * $l, ($b->[1] + $b->[2]) * $l, ++$c,
+      $b->[2] * $l, $gap,
 	format_hms($b->[1] * $l), format_hms(($b->[1] + $b->[2]) * $l), format_hms($b->[2] * $l);
   }
 }
 
-sub split_file ($;$$$) {
-  my ($self, $name_cb, $finish_cb) = (shift, shift, shift);
+my $splitter_loaded;
+
+sub split_file ($;$$) {
+  my ($self, $opt) = (shift, shift);
   my $blocks = $self->get(shift || 'b');
   my $t = $self->get('input_type');
   die "Only MP3 split supported" unless $t and $t eq 'mp3';
@@ -547,7 +570,10 @@ sub split_file ($;$$$) {
   my @req = map [$_->[1] * $l, $_->[2] * $l], grep $_->[0] > 0, @$blocks
     or return;
   require MP3::Splitter;
-  MP3::Splitter::mp3split($self->get('filename'), @req);
+  die "MP3::Splitter v0.02 required"
+    if !$splitter_loaded++ and 0.02 > MP3::Splitter->VERSION;
+  MP3::Splitter::mp3split($self->get('filename'), $opt || {}, @req);
+  $self;
 }
 
 sub new {
@@ -556,7 +582,7 @@ sub new {
   $s->set(@_);
   bless \$s, $class;
 }
-sub set ($$$) { ${$_[0]}->set($_[1],$_[2]) }
+sub set ($$$) { ${$_[0]}->set($_[1],$_[2]); $_[0] }
 sub get ($$)  { ${$_[0]}->get($_[1]) }
 
 my @exchange = qw(chunks rms_data medians sorted channels min max
@@ -592,10 +618,18 @@ Audio::FindChunks - breaks audio files into sound/silence parts.
   Audio::FindChunks->new(cache_rms => 1, filename => 'xxx.mp3',
 			 stem_strip_extension => 1)->output_blocks();
 
+  # Remove start/end silence (if longer than 0.2sec):
+  Audio::FindChunks->new(cache_rms => 1, filename => 'xxx.mp3',
+			 min_actual_silence_sec => 1e100)->split_file();
+
+  # Split a multiple-sides tape recording
+  Audio::FindChunks->new(filename => 'xxx.mp3', min_actual_silence_sec => 11
+			)->split_file({verbose => 1});
+
 =head1 DESCRIPTION
 
 Audio sequence is broken into parts which contain only noise ("gaps"),
-and parts with usable signal ("tracks").  
+and parts with usable signal ("tracks").
 
 The following configuration settings (and defaults) are supported:
 
@@ -641,6 +675,7 @@ The following configuration settings (and defaults) are supported:
   # Final enlargement of runs of signal
     extend_track_end_sec => 0.5,	 # Unconditional enlargement
     extend_track_begin_sec => 0.3,	 # likewise
+    min_boundary_silence_sec => 0.2,	 # Ignore short silence at start/end
 
 Note that C<above_thres_window> is the only value specified directly in
 units of chunks; the other C<*_sec> may be optionally specified in units
@@ -650,8 +685,10 @@ parameters are decreased.
 
 These values are mirrored from other values if not explicitly specified:
 
- min_actual_silence_sec << min_silence_sec # Ignore short gaps
- min_silence_chunks_merge << min_silence_chunks # See above
+ min_actual_silence_sec << min_silence_sec		# Ignore short gaps
+ min_start_silence_sec  << min_boundary_silence_sec	# Same at start
+ min_end_silence_sec    << min_boundary_silence_sec	# Same at end
+ min_silence_chunks_merge << min_silence_chunks		# See above
 
  cache_rms_write <<< cache_rms	  # Boolean: write RMS cache
  cache_rms_read  <<< cache_rms	  # Boolean: read RMS cache (unless 'filter')
@@ -691,15 +728,24 @@ them.
 prints a human-readable display of RMS (or similar) values.  Defaults to
 C<rms_data>; additional possible values are C<medians> and C<sorted>.
 
-=item C<output_blocks([key])>
+=item C<output_blocks([option_hashref], [key])>
 
-prints a human-readable display of obtained audio chunks.  Defaults to
-C<b>; additional possible values are C<b0> to C<b4>.
+prints a human-readable display of obtained audio chunks.  C<key> defaults to
+C<b>; additional possible values are C<b0> to C<b4>.  Recognized options key
+is C<format>; defaults to C<long>, which results in windy output; the value
+C<short> results in shorter output and no preamble.  Preamble lines are all
+C<#>-commented; any output line is in the form
 
-=item C<split_file([name_handler], [finish_hanlder], [key])>
+  START_SEC =END_SEC # COMMENT
+
+With C<short> format there is no preamble, and (currently) C<COMMENT> is of
+the form C<PIECE_NUMBER len=PIECE_DURATION_SEC>.  These formats are
+recognized, e.g., by MP3::Split::mp3split_read().
+
+=item C<split_file([options], [key])>
 
 Splits the file (only MP3 via L<MP3::Splitter> is supported now).  The
-meaning of optional handlers is the same as for L<MP3::Splitter>.  Defaults to
+meaning of options is the same as for L<MP3::Splitter>.  Defaults to
 blocks of type C<b>; additional possible values are C<b0> to C<b4>.
 
 =item @vals = get_rmsinfo(); set_rmsinfo(@vals)
@@ -776,6 +822,7 @@ The current dependecies for values which are not explicitly set():
 				extend_track_begin_chunks
 				extend_track_end_chunks
 				min_actual_silence_chunks
+				min_start_silence_chunks min_end_silence_chunks
 
 If C<rms_data> is not read from cached source, a lot of other fields may
 be also set from the WAV header (unless C<raw_pcm>).
@@ -834,11 +881,11 @@ C<E<gt>E<gt>E<gt>b0>.
 =item Find certain intervals of sound and silence
 
 Long enough runs of signal chunks are proclaimed carrying sound; likewise
-for noise chunks and silence.  Governed by C<max_tracks>, C<min_signal_sec>,
-C<min_silence_sec>.  C<E<gt>E<gt>E<gt>b1>.
+for noise chunks and silence.  Governed by C<max_tracks>, C<min_signal_chunks>,
+C<min_silence_chunks>.  C<E<gt>E<gt>E<gt>b1>.
 
 Long enough "unproclaimed" runs of chunks with only short bursts of
-signal are proclaimed silence.  Governed by C<ignore_signal_sec>,
+signal are proclaimed silence.  Governed by C<ignore_signal_chunks>,
 C<E<gt>E<gt>E<gt>b2>; and C<min_silence_chunks_merge>, C<E<gt>E<gt>E<gt>b3>.
 
 =item Merge undecided into sound/silence
@@ -861,13 +908,14 @@ Extend runs of audio: join the consequent runs of chunks of adjacent gaps
 where the energy level
 remains significantly larger than the average level in this gap.
 Additionally, unconditionally extend the tracks by a small amount.
-Governed by C<local_threshold_factor>, C<extend_track_end_sec>,
-C<extend_track_begin_sec>.
+Governed by C<local_threshold_factor>, C<extend_track_end_chunks>,
+C<extend_track_begin_chunks>.
 
 =item Long enough gap candidates are gaps
 
 Gaps which became too short are considered audio and are merged into
-neighbors.  Governed by C<min_actual_silence_sec>; C<E<gt>E<gt>E<gt>b>.
+neighbors.  Governed by C<min_actual_silence_chunks>, C<min_start_silence_chunks>,
+C<min_end_silence_chunks>; C<E<gt>E<gt>E<gt>b>.
 
 =back
 
@@ -883,7 +931,7 @@ neighbors.  Governed by C<min_actual_silence_sec>; C<E<gt>E<gt>E<gt>b>.
 
 =head1 SEE ALSO
 
-C<Data::Flow>
+C<Data::Flow>, C<MP3::Split>
 
 =head1 AUTHOR
 

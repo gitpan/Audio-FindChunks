@@ -10,3 +10,13 @@ Revision history for Perl extension Audio::FindChunks.
 	Allow caseless match of file types...
 	Test that output_blocks(), output_levels() do not die too...
 	Add mp3 split via MP3::Splitter.
+
+0.03	End silence was erroneously subject to min_actual_silence_sec filter.
+		Introduce new entries min_start_silence_sec,
+		min_end_silence_sec, min_boundary_silence_sec.
+	Examples of split_file().
+	In documentation: change dependencies *_sec => *_chunks.
+	(!!!) Uncompatible change to optional arguments of split_file().
+	New parameter to output_blocks(); make output more machine-readable.
+	Make set(), output_level(), output_blocks() return $self, thus
+ 		making them chainable: $self->set(...)->output_*()->....
