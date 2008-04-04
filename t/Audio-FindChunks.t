@@ -7,7 +7,7 @@
 # change 'tests => 1' to 'tests => last_test_to_print';
 
 use Test;
-BEGIN { plan tests => 16 };
+BEGIN { plan tests => 30 };
 use Audio::FindChunks;
 ok(1); # If we made it this far, we're ok.
 
@@ -19,7 +19,7 @@ ok(1); # If we made it this far, we're ok.
 my $pi2 = 2*atan2(0, -1);
 sub write_sine ($$$$$) {
   my ($fh, $samples, $freq, $ampl, $phase) = @_;
-  while ($samples--) {
+  while ($samples-- >= 0) {
     my $v = sin($phase) * $ampl;
     $phase += $freq * $pi2;
     my $short = pack 'v', unpack 'S', pack 's', $v;
@@ -48,12 +48,14 @@ unless (-f 'tmp.rms') {
   binmode OUT;
   write_header(\*OUT, 2 * 2 * 44100 * $tot);
   for my $c (@chunks) {
-    write_sine(\*OUT, 44100 * $c->[0], 2000/44100, $c->[1], 0);
+    write_sine(\*OUT, int(0.5 + 44100 * $c->[0]), 2000/44100, $c->[1], 0);
   }
   close OUT or die;
 }
 ok(1,1, 'create a wave or RMS');
 
+my $step;
+for $step (1,2) {
 my $h = Audio::FindChunks->new(	stem_strip_extension => 1,
 				min_silence_sec => 1.5,		# default 2
 				cache_rms => 1,
@@ -75,19 +77,19 @@ sub str { join ' ', map "[@$_]", @{$h->get( shift )} }
 
 my @ques = map "b$_", 0..4, '';
 my @ans = split /\n/, <<EOT;
-[0 0 47] [1 47 206] [0 253 3] [1 256 9] [0 265 3] [1 268 9] [0 277 3] [1 280 115] [0 395 3] [1 398 9] [0 407 3] [1 410 255] [0 665 27]
-[-1 0 47] [2 47 206] [0 253 3] [1 256 9] [0 265 3] [1 268 9] [0 277 3] [2 280 115] [0 395 3] [1 398 9] [0 407 3] [2 410 255] [-1 665 27]
-[-1 0 47] [2 47 206] [0 253 27] [2 280 115] [0 395 15] [2 410 255] [-1 665 27]
-[-1 0 47] [2 47 206] [-1 253 27] [2 280 115] [-1 395 15] [2 410 255] [-1 665 27]
-[-1 0 47] [2 47 206] [-1 253 27] [2 280 115] [-1 395 15] [2 410 255] [-1 665 27]
-[-1 0 44] [2 44 214] [-1 258 19] [2 277 393] [-1 670 22]
+[0 0 47] [1 47 206] [0 253 3] [1 256 9] [0 265 3] [1 268 9] [0 277 3] [1 280 115] [0 395 3] [1 398 9] [0 407 3] [1 410 255] [0 665 28]
+[-1 0 47] [2 47 206] [0 253 3] [1 256 9] [0 265 3] [1 268 9] [0 277 3] [2 280 115] [0 395 3] [1 398 9] [0 407 3] [2 410 255] [-1 665 28]
+[-1 0 47] [2 47 206] [0 253 27] [2 280 115] [0 395 15] [2 410 255] [-1 665 28]
+[-1 0 47] [2 47 206] [-1 253 27] [2 280 115] [-1 395 15] [2 410 255] [-1 665 28]
+[-1 0 47] [2 47 206] [-1 253 27] [2 280 115] [-1 395 15] [2 410 255] [-1 665 28]
+[-1 0 44] [2 44 214] [-1 258 19] [2 277 393] [-1 670 23]
 EOT
 
 for my $q (0..$#ques) {
   ok (str($ques[$q]), $ans[$q], "field $ques[$q]");
 }
 
-open OUT, '>blocks.tmp' or warn;
+open OUT, ">blocks$step.tmp" or warn;
 my $old = select OUT;
 
 $h->output_blocks();
@@ -98,5 +100,8 @@ ok(1, 1, 'output_levels()');
 
 select $old;
 close OUT or warn;
+}
 
--f 'tmp.wav' and (unlink 'tmp.wav' or warn "unlink: $!");
+my $del = $ENV{AUDIO_FH_TEST_UNLINK};
+defined $del or $del = 1;
+$del and -f 'tmp.wav' and (unlink 'tmp.wav' or warn "unlink: $!");

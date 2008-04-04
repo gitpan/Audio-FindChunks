@@ -4,7 +4,8 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 
 $define = '';
-$define .= ' -DNATIVE_LE_SHORTS' if pack('v', 0x0102) eq pack 's', 0x0102;
+$define .= ' -DNATIVE_LE_SHORTS'	# s! was introduced on v5.6
+ if pack('v', 0x0102) eq (eval {pack 's!', 0x0102} or pack 's', 0x0102);
 
 WriteMakefile(
     NAME              => 'Audio::FindChunks',
@@ -20,4 +21,5 @@ WriteMakefile(
     INC               => '-I.', # e.g., '-I. -I/usr/include/other'
 	# Un-comment this if you add C files to link with later:
     OBJECT            => '$(O_FILES)', # link all the C files too
+    clean             => {FILES => '*.tmp tmp.*'},
 );

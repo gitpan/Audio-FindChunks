@@ -20,3 +20,10 @@ Revision history for Perl extension Audio::FindChunks.
 	New parameter to output_blocks(); make output more machine-readable.
 	Make set(), output_level(), output_blocks() return $self, thus
  		making them chainable: $self->set(...)->output_*()->....
+
+0.04	Run test extraction twice (without/with tmp.rms).
+	make `make clean' to clean test temporaries.
+	Allow for shortsize > 2 and longsize > 4 starting with v5.6.0.
+	Correct capitalization of dB in output_levels().
+	Improve docs for output_levels(), output_blocks().
+	Test could loop indefinitely due to while (--$c) done on an FP value.

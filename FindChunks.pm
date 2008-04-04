@@ -11,7 +11,7 @@ BEGIN {
 
   @ISA = qw(DynaLoader);
 
-  $VERSION = '0.03';
+  $VERSION = '0.04';
 
   bootstrap Audio::FindChunks $VERSION;
 }
@@ -23,11 +23,12 @@ sub default ($$$) {my ($o, $k, $v) = @_; $o->{$k} = $v unless defined $o->{$k}}
 my $le_short_size  = length pack 'v', 0;
 my $short_size	   = length pack 's', 0;
 my $int_size	   = length pack 'i', 0;
-my $long_size	   = length pack 'l', 0;
+my $long	   = ($] >= 5.006 ? 'l!' : 'l');
+my $long_size	   = length pack $long, 0;
 my $double_size    = length pack 'd', 0;
 my $pointer_size   = length pack 'p', 0;
 my $pointer_unpack = (($pointer_size == $int_size) ? 'I' : 'L');
-my $long_min	   = unpack 'l', pack 'l', -1e100;
+my $long_min	   = unpack $long, pack $long, -1e100;
 my $long_max	   = -$long_min-1;
 
 sub le_short_sample_multichannel ($$$$$$) {
@@ -206,7 +207,7 @@ my %filters = (
 			  binmode *RMS; local $/; my @in;
 			  ($in[0] = <RMS>) =~ s/^GramoFile Binary RMS Data\n//i
 			      or die "Unknown format of RMS file";
-			  push @in, unpack 'l2', substr $in[0], 0, 2*$long_size;
+			  push @in, unpack "${long}2", substr $in[0], 0, 2*$long_size;
 			  substr($in[0], 0, 2*$long_size) = '';
 			  die "Malformed length of RMS file"	# sam/chunk, chunks
 			      unless $in[2] * $double_size == length $in[0];
@@ -257,7 +258,7 @@ my %filters = (
  # Unpack
   b0 => [sub {	my ($c, @b) = -1; my $tracks = shift->[0];
 		my $cnt = length($tracks)/(3*$long_size);
-		my @bl = unpack 'l'.(3*$cnt), $tracks;
+		my @bl = unpack $long.(3*$cnt), $tracks;
 		while (++$c < $cnt) { # [SIGNAL/NOISE, start, len]
 		    push @b, [@bl[3*$c, 3*$c + 1, 3*$c + 2]];
 		} return [@b] }, 'maybe_trk_pk'],
@@ -418,7 +419,7 @@ sub read_averages ($) {
   syswrite $out_fh, $buf or die "Error duping output: $!"
     if $out_fh and $vals->{header};	# in PCM mode we write later
   my $off = ($vals->{header} ? 0 : length $buf);
-  my @stats = (pack 'd2 l2', 0, 0, $long_max, $long_min) x $self->get('channels');
+  my @stats = (pack "d2 ${long}2", 0, 0, $long_max, $long_min) x $self->get('channels');
 
   my $read = $self->get('bytes_per_chunk') - $off;
   my $rem = $self->get('sizedata');
@@ -458,7 +459,7 @@ sub read_averages ($) {
   $c = 0;
   my (@min, @max);
   for my $s (@stats) {	# Take maximum per channel
-    (undef, undef, my $min, my $max) = unpack 'd2 l2', $s;
+    (undef, undef, my $min, my $max) = unpack "d2 ${long}2", $s;
     $min[$c] = $min;
     $max[$c++] = $max;
   }
@@ -472,7 +473,7 @@ sub read_averages ($) {
       or die "Can't open RMS file `$f' for write: $!";
     binmode RMS;
     print RMS "GramoFile Binary RMS Data\n";
-    print RMS pack 'l2', map $self->get($_), qw(samples_per_chunk chunks);
+    print RMS pack "${long}2", map $self->get($_), qw(samples_per_chunk chunks);
     print RMS $d[0];
     close RMS or die "closing RMS file `$f' for write: $!";
   }
@@ -500,7 +501,7 @@ sub output_level ($$;$) {
   my $l2 = sqrt($l);
   $db = sprintf "%.0f", $db;
   my $s = '#' x (($db+96)/3) . $represent[$db % 3];
-  printf "%6d:%11s:%7.1f=%4.0fdb: %s\n", $n, format_hms($n*$d), sqrt($l), $db, $s;
+  printf "%6d:%11s:%7.1f=%4.0fdB: %s\n", $n, format_hms($n*$d), sqrt($l), $db, $s;
 }
 
 sub output_levels ($;$) {
@@ -523,7 +524,7 @@ EOP
     print "\t" if $c;
     my @l = map $opts->{$_}[$c], 'min', 'max';
     my @db = map 20*log(abs($_)/(1<<15))/log(10), @l;
-    printf "ch%d: %.1f .. %.1f (%.0fdb;%.0fdb).", $c, @l, @db;
+    printf "ch%d: %.1f .. %.1f (%.0fdB;%.0fdB).", $c, @l, @db;
   }
   print "\n";
   my $n = 0;
@@ -728,6 +729,22 @@ them.
 prints a human-readable display of RMS (or similar) values.  Defaults to
 C<rms_data>; additional possible values are C<medians> and C<sorted>.
 
+The format of the output data is similar to
+
+  Frequency: 44100.  Stride: 4; 2 channels.
+  Chunk=0.1sec=17640bytes.
+  ch0: -9999.0 .. 9999.0 (-10dB;-10dB).	ch1: -9999.0 .. 9999.0 (-10dB;-10dB).
+       0:        0.0:   20.7= -61dB: ###########>
+       1:        0.1:   20.7= -61dB: ###########>
+       2:        0.2:   20.7= -61dB: ###########>
+  ...
+
+(with the C<ch0 ETC> line empty if data is read from an RMS file).  Each
+chunk gives a line with the chunk number, start (in sec), RMS intensity
+(in linear scale and in decibel), and the graphical representation of the
+decibel level (each C<#> counts as 3dB, C<:> adds 1dB, and C<E<gt>>
+adds 2dB).
+
 =item C<output_blocks([option_hashref], [key])>
 
 prints a human-readable display of obtained audio chunks.  C<key> defaults to
@@ -741,6 +758,12 @@ C<#>-commented; any output line is in the form
 With C<short> format there is no preamble, and (currently) C<COMMENT> is of
 the form C<PIECE_NUMBER len=PIECE_DURATION_SEC>.  These formats are
 recognized, e.g., by MP3::Split::mp3split_read().
+
+The default format is currently
+
+  # threshold: 1078.46653890971 (in 20.7214163971884 .. 7072.35556648067)
+  4.4	=25.8	# n=1 duration 21.4; gap 4.4 (4.4 .. 25.8; 21.4)
+  27.7	=67	# n=2 duration 39.3; gap 1.9 (27.7 .. 1m07.0; 39.3)
 
 =item C<split_file([options], [key])>
 
@@ -848,7 +871,8 @@ The algorithm for finding boundaries of parts follows closely the algorithm
 used by GramoFile v1.7 (however, I<this> version is I<fully> customizable,
 fully documented, and has some significant bugs fixed).  The keywords in the
 discussion below refer to customization parameters; keywords of the form
-C<E<gt>E<gt>E<gt>key> refer to C<get()>able values.
+C<E<gt>E<gt>E<gt>key> refer to C<get()>able values set on the step in
+question.
 
 =over
 
