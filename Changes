@@ -27,3 +27,6 @@ Revision history for Perl extension Audio::FindChunks.
 	Correct capitalization of dB in output_levels().
 	Improve docs for output_levels(), output_blocks().
 	Test could loop indefinitely due to while (--$c) done on an FP value.
+	Set AUDIO_FH_TEST_UNLINK=0 in environment to keep the .wav file.
+
+0.05	Use sysread() instead of <> to read RMS (gives better alignment).

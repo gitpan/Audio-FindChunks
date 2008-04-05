@@ -11,7 +11,7 @@ BEGIN {
 
   @ISA = qw(DynaLoader);
 
-  $VERSION = '0.04';
+  $VERSION = '0.05';
 
   bootstrap Audio::FindChunks $VERSION;
 }
@@ -204,9 +204,13 @@ my %filters = (
   bytes_per_chunk   => [sub {shift()*shift}, 'samples_per_chunk', 'bytes_per_sample'],
   rms_data_arr_f => [sub {return unless shift;
 			  local *RMS; open RMS, '< ' . shift or return;	# No file is OK
-			  binmode *RMS; local $/; my @in;
-			  ($in[0] = <RMS>) =~ s/^GramoFile Binary RMS Data\n//i
+			  binmode *RMS;
+			  my $c = -s \*RMS;
+			  my @in;
+			  26 == sysread RMS, $in[0], 26 or die "Short read on RMS";
+			  $in[0] =~ /^GramoFile Binary RMS Data\n/i
 			      or die "Unknown format of RMS file";
+			  $c - 26 == sysread RMS, $in[0], $c - 26 or die "Short read on RMS";
 			  push @in, unpack "${long}2", substr $in[0], 0, 2*$long_size;
 			  substr($in[0], 0, 2*$long_size) = '';
 			  die "Malformed length of RMS file"	# sam/chunk, chunks
