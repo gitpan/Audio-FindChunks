@@ -5,13 +5,16 @@ void
 le_short_sample_stats(char *buf, int stride, long samples, array_stats_t *stat)
 {
     long i = 0;
-    while (i++ <= samples) {
+    char *ibuf = buf;
+    while (++i <= samples) {
 	short elt;
 
 	buf += stride;
 #if NATIVE_LE_SHORTS
+#  define NAT 1
 	elt = *(short*)buf;
 #else
+#  define NAT 0
 	{
 	    unsigned int u = *(unsigned char*)buf;
 	    u += (*(unsigned char*)(buf+1))<<8;
@@ -19,6 +22,16 @@ le_short_sample_stats(char *buf, int stride, long samples, array_stats_t *stat)
 		elt = u - 0x10000;
 	    else
 		elt = u;
+	}
+#endif
+#if WAVESTATS_DEBUG
+	if (elt > 40 && buf >= ibuf + 4) {
+	    char b[512];
+	    sprintf(b, "@%#lx: %d, NAT=%d; %#x %#x %#x %#x | %#x %#x %#x %#x\n",
+		    (long)(buf - ibuf), (int)elt, NAT,
+		    (int)buf[-4], (int)buf[-3], (int)buf[-2], (int)buf[-1],
+		    (int)buf[0], (int)buf[1], (int)buf[2], (int)buf[3]);
+	    write(2,b,strlen(b));
 	}
 #endif
 	if (elt < stat->min)

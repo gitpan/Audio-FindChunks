@@ -7,7 +7,7 @@
 # change 'tests => 1' to 'tests => last_test_to_print';
 
 use Test;
-BEGIN { plan tests => 30 };
+BEGIN { plan tests => 32 };
 use Audio::FindChunks;
 ok(1); # If we made it this far, we're ok.
 
@@ -101,6 +101,9 @@ ok(1, 1, 'output_levels()');
 select $old;
 close OUT or warn;
 }
+
+ok(Audio::FindChunks::_s_size, Audio::FindChunks::__s_size, 'sizes of struct array_stats_t');
+ok(Audio::FindChunks::___sh_square(1e4), 1e8, 'assigning square of short to double');
 
 my $del = $ENV{AUDIO_FH_TEST_UNLINK};
 defined $del or $del = 1;

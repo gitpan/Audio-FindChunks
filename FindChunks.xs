@@ -8,6 +8,9 @@
 
 typedef char void_char;
 
+#define _s_size()	(sizeof(array_stats_t))
+#define ___sh_square(x)	((x) * (x))
+
 MODULE = Audio::FindChunks		PACKAGE = Audio::FindChunks
 PROTOTYPES: ENABLE
 
@@ -38,7 +41,7 @@ double_sort(input, output, cnt)
 	long	cnt
 
 double
-double_sum(input, off, cnt);
+double_sum(input, off, cnt)
 	double *	input
 	long	off
 	long	cnt
@@ -63,3 +66,10 @@ le_short_sample_stats(buf, stride, samples, stat)
 	int	stride
 	long	samples
 	array_stats_t *	stat
+
+int
+_s_size()
+
+double
+___sh_square(in)
+	short in

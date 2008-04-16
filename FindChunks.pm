@@ -11,9 +11,11 @@ BEGIN {
 
   @ISA = qw(DynaLoader);
 
-  $VERSION = '0.05';
+  $VERSION = '1.00';
 
   bootstrap Audio::FindChunks $VERSION;
+  my $do_dbg	   = !!$ENV{FIND_CHUNKS_DEBUG};	# Convert to logical
+  eval "sub do_dbg () {$do_dbg}";
 }
 
 # Preloaded methods go here.
@@ -30,6 +32,7 @@ my $pointer_size   = length pack 'p', 0;
 my $pointer_unpack = (($pointer_size == $int_size) ? 'I' : 'L');
 my $long_min	   = unpack $long, pack $long, -1e100;
 my $long_max	   = -$long_min-1;
+my $do_dbg	   = $ENV{FIND_CHUNKS_DEBUG};
 
 sub le_short_sample_multichannel ($$$$$$) {
   my ($totstride, $stride, $channels, $out, $chunksize) =
@@ -37,8 +40,8 @@ sub le_short_sample_multichannel ($$$$$$) {
   my $size = length $_[0];
   my $bufaddr = unpack $pointer_unpack, pack 'p', $_[0];
   die "Size of buffer not multiple of total stride" if $size % $totstride;
-  # Do in multiples of 4K (to falicitate Level I cache)
-  $chunksize = $totstride * int((1<<13)/$totstride) unless defined $chunksize;
+  # Do in multiples of 7K (to falicitate lcd 8K Level I cache)
+  $chunksize = $totstride * int((7*(1<<10))/$totstride) unless defined $chunksize;
   my $processed = 0;
   while ($size > 0) {
     $chunksize = $size if $chunksize > $size;
@@ -46,9 +49,13 @@ sub le_short_sample_multichannel ($$$$$$) {
     my $samples = $chunksize / $totstride;
     $processed += $samples;
     for my $c (0..$channels-1) {
+      warn sprintf "Ch %d: Samples %d %d %d %d ..., totstride %d, %d samples\n", 
+	$c, unpack('s4', unpack 'P8', pack $pointer_unpack, $bufaddr + $stride * $c), $totstride, $samples
+	  if do_dbg();
 #  void le_short_sample_stats(char *buf, int stride, long samples, array_stats_t *stat)
       le_short_sample_stats($bufaddr + $stride * $c, $totstride, $samples,
 			    $out->[$c]);
+      warn sprintf "  => %d\n", unpack 'd', $out->[$c] if do_dbg();
     }
     $bufaddr += $chunksize;
   }
@@ -76,6 +83,9 @@ my $wav_header = <<EOH;
 EOH
 
 my @wav_fields = ($wav_header =~ /^\s*\w+\s*#\s*(\w+)/mg);
+
+$wav_header =~ s/#.*//g;		# For v5.005
+
 my $header_size = length pack $wav_header, (0) x 20;
 sub MY_INF () {1e200}
 
@@ -162,7 +172,7 @@ my %mirror_from = (	# May be set separately, otherwise are synonims
 
 my %chunk_times =
   map {	(my $n = $_) =~ s/_sec/_chunks/;
-	($n => {filter
+	($n => {'filter'
 		=> [sub {rnd(shift()/shift)}, $_, 'sec_per_chunk']}) }
     grep /_sec$/, keys %defaults, keys %mirror_from;
 
@@ -404,6 +414,8 @@ my %recipes = (
 		}},
   );
 
+sub __s_size() {length pack "d2 ${long}2", 0, 0, 0, 0}
+
 sub read_averages ($) {
   my $self = shift;
   my $fh = $self->get('fh_bin');
@@ -510,6 +522,7 @@ sub output_level ($$;$) {
 
 sub output_levels ($;$) {
   my ($self, $what) = (shift, shift);
+  local $\ = "";
   $what ||= 'rms_data';			# 1-element array with a 'd'-packed elt
   my ($opts,$o) = {};
   for $o ($what, qw(frequency bytes_per_sample channels sec_per_chunk
@@ -540,6 +553,7 @@ sub output_blocks ($;$) {
   my $self = shift;
   my $opts = shift;
   my $type = 'b';
+  local $\ = "";
   if ($opts and not ref $opts) {
     $type = $opts;
     $opts = {};
@@ -630,6 +644,9 @@ Audio::FindChunks - breaks audio files into sound/silence parts.
   # Split a multiple-sides tape recording
   Audio::FindChunks->new(filename => 'xxx.mp3', min_actual_silence_sec => 11
 			)->split_file({verbose => 1});
+
+  # Output the RMS levels of small interval in human-readable form
+  Audio::FindChunks->new(filename => 'xxx.mp3')->output_levels();
 
 =head1 DESCRIPTION
 
