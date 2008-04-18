@@ -31,7 +31,7 @@ Revision history for Perl extension Audio::FindChunks.
 
 0.05	Use sysread() instead of <> to read RMS (gives better alignment).
 
-0.06	Remove a spurious ";" in .xs.
+1.00	Remove a spurious ";" in .xs.
 	More 5.005-compatibility fixes (# in pack, => on separate line).
 	More output_levels() examples.
 	Protect output_levels(), output_blocks() against $\.
@@ -39,3 +39,4 @@ Revision history for Perl extension Audio::FindChunks.
 	Decrease the size of subchunk to 7KB.
 	Add low-level debugging code.
 	Correct off-by-one error in le_short_sample_stats().
+1.01	Protect against broken Data::Flow v1.00.

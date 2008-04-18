@@ -11,12 +11,14 @@ BEGIN {
 
   @ISA = qw(DynaLoader);
 
-  $VERSION = '1.00';
+  $VERSION = '1.01';
 
   bootstrap Audio::FindChunks $VERSION;
   my $do_dbg	   = !!$ENV{FIND_CHUNKS_DEBUG};	# Convert to logical
   eval "sub do_dbg () {$do_dbg}";
 }
+
+die "Version 1.00 of Data::Flow is defective" if $Data::Flow::VERSION eq '1.00';
 
 # Preloaded methods go here.
 
