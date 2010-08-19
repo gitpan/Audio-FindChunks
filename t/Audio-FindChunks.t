@@ -2,6 +2,10 @@
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl Audio-FindChunks.t'
 
+# A poor-man indicator of a crash
+BEGIN {open CR, '>tst-run' and close CR}	# touch a file
+END {unlink 'tst-run'}				# remove it - unless we crash
+
 #########################
 
 # change 'tests => 1' to 'tests => last_test_to_print';

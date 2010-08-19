@@ -40,3 +40,5 @@ Revision history for Perl extension Audio::FindChunks.
 	Add low-level debugging code.
 	Correct off-by-one error in le_short_sample_stats().
 1.01	Protect against broken Data::Flow v1.00.
+1.02	Enable remote machine-code debugging of crashes (looks like it crashes
+	on big-endian 64-bit machines...).

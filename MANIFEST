@@ -6,8 +6,10 @@ ppport.h
 README
 typemap
 t/Audio-FindChunks.t
+t/zzz_debug-crash.t
 FindChunks.pm
 wavestats.c
 wavestats.h
 META.yml                                 Module meta-data (added by MakeMaker)
 TODO
+utils/auto-debug-module.pl		Source level machine code debug crashes
