@@ -11,7 +11,7 @@ BEGIN {
 
   @ISA = qw(DynaLoader);
 
-  $VERSION = '1.02';
+  $VERSION = '1.03';
 
   bootstrap Audio::FindChunks $VERSION;
   my $do_dbg	   = !!$ENV{FIND_CHUNKS_DEBUG};	# Convert to logical

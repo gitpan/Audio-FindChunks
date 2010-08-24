@@ -3,7 +3,7 @@ use strict;
 use File::Path 'mkpath';
 use File::Copy 'copy';
 
-my $VERSION = '0.00';
+my $VERSION = '0.01';
 die "Debugging cycle detected"		# set to -1 to allow extra iteration
   if ++$ENV{PERL_DEBUG_MCODE_CYCLE} > 1;
 
@@ -148,13 +148,15 @@ system 'make' and die "system(make): rc=$?";
 
 my $p = ($^X =~ m([\\/]) ? $^X : `which perl`) || $^X;
 chomp $p unless $p eq $^X;
-my @cmd;
+my(@cmd, $ver);
 
 for my $script (@ARGV) {
   if ($gdb) {
+    $ver = $gdb;
     my $gdb_in = 'gdb-in';
     open TT, ">$gdb_in" or die "Can't open $gdb_in for write: $!";
     # bt full: include local vars; disas /m : with source lines (FULL function?!)
+    # XXX all-registers may take 6K on amd64; maybe put at end?
     print TT <<EOP;		# Slightly different order than dbx...
 run -Mblib $script
 echo \\n=====================================\\n\\n
@@ -162,9 +164,11 @@ bt
 echo \\n=====================================\\n\\n
 info all-registers
 echo \\n=====================================\\n\\n
-disassemble /m
+disassemble
 echo \\n=====================================\\n\\n
 bt 5 full
+echo \\n=====================================\\n\\n
+disassemble /m
 quit
 EOP
     close TT or die "Can't close $gdb_in for write: $!";
@@ -172,6 +176,7 @@ EOP
     #open STDIN, $gdb_in or die "cannot open STDIN from $gdb_in: $!";
     @cmd = (qw(gdb -batch), "--command=$gdb_in", $p);
   } else {			# Assume $script has no spaces or metachars
+    $ver = $dbx;
     # where -v		# Verbose traceback (include function args and line info)
     # dump                  # Print all variables local to the current procedure
     # regs [-f] [-F]        # Print value of registers (-f/-F: SPARC only)
@@ -182,5 +187,12 @@ EOP
 	    $p);
   }
   system @cmd and die "Running @cmd: rc=$?";
+  print $ver;
 }
 1;
+
+__END__
+
+# Changelog:
+0.01	Print version of the debugger at end
+	For GDB, protect against non-present disassemble /m
