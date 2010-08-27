@@ -43,3 +43,4 @@ Revision history for Perl extension Audio::FindChunks.
 1.02	Enable remote machine-code debugging of crashes (looks like it crashes
 	on big-endian 64-bit machines...).
 1.03	Upgrade remote machine-code debugging to v0.01.
+1.04	Upgrade remote machine-code debugging to v0.02.

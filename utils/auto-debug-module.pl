@@ -3,7 +3,7 @@ use strict;
 use File::Path 'mkpath';
 use File::Copy 'copy';
 
-my $VERSION = '0.01';
+my $VERSION = '0.02';			# Changelog at end
 die "Debugging cycle detected"		# set to -1 to allow extra iteration
   if ++$ENV{PERL_DEBUG_MCODE_CYCLE} > 1;
 
@@ -155,8 +155,14 @@ for my $script (@ARGV) {
     $ver = $gdb;
     my $gdb_in = 'gdb-in';
     open TT, ">$gdb_in" or die "Can't open $gdb_in for write: $!";
-    # bt full: include local vars; disas /m : with source lines (FULL function?!)
+    # bt full: include local vars (not in 5.0; is in 6.5; is in 6.3, but crashes:
+	# http://www.cpantesters.org/cpan/report/2fffc390-afd2-11df-834b-ae20f5ac70d3)
+    # disas /m : with source lines (FULL function?!) (not in 6.5; is in 7.0.1)
     # XXX all-registers may take 6K on amd64; maybe put at end?
+    my $proc = (-d "/proc/$$" ? <<EOP : '');
+info proc mapping
+echo \\n=====================================\\n\\n
+EOP
     print TT <<EOP;		# Slightly different order than dbx...
 run -Mblib $script
 echo \\n=====================================\\n\\n
@@ -168,7 +174,7 @@ disassemble
 echo \\n=====================================\\n\\n
 bt 5 full
 echo \\n=====================================\\n\\n
-disassemble /m
+$proc disassemble /m
 quit
 EOP
     close TT or die "Can't close $gdb_in for write: $!";
@@ -176,6 +182,9 @@ EOP
     #open STDIN, $gdb_in or die "cannot open STDIN from $gdb_in: $!";
     @cmd = (qw(gdb -batch), "--command=$gdb_in", $p);
   } else {			# Assume $script has no spaces or metachars
+	# Linux: /proc/$proc/maps has the text map
+	# Solaris: /proc/$proc/map & /proc/$proc/rmap: binary used/reserved
+	#   /usr/proc/bin/pmap $proc (>= 2.5) needs -F (force) inside dbx
     $ver = $dbx;
     # where -v		# Verbose traceback (include function args and line info)
     # dump                  # Print all variables local to the current procedure
@@ -183,7 +192,7 @@ EOP
     # list -<n>             # List previous <n> lines (next with +)
     #   -i or -instr        # Intermix source lines and assembly code
     @cmd = (qw(dbx -c),		# We do not do non-integer registers...
-	    qq(run -Mblib $script; echo; echo =================================; echo; where -v; echo; echo =================================; echo; dump; echo; echo =================================; echo; regs; echo; echo =================================; echo; list -i +1; echo; echo =================================; echo; list -i -10; echo; echo =================================; echo; echo ============== up 1:; up; dump; echo; echo ============== up 2:; up; dump; echo; echo ============== up 3:; up; dump; echo; echo ============== up 4:; up; dump; quit),
+	    qq(run -Mblib $script; echo; echo =================================; echo; where -v; echo; echo =================================; echo; dump; echo; echo =================================; echo; regs; echo; echo =================================; echo; list -i +1; echo; echo =================================; echo; list -i -10; echo; echo =================================; echo; echo ============== up 1:; up; dump; echo; echo ============== up 2:; up; dump; echo; echo ============== up 3:; up; dump; echo; echo ============== up 4:; up; dump; echo ==============; /usr/proc/bin/pmap -F \$proc; quit),
 	    $p);
   }
   system @cmd and die "Running @cmd: rc=$?";
@@ -196,3 +205,4 @@ __END__
 # Changelog:
 0.01	Print version of the debugger at end
 	For GDB, protect against non-present disassemble /m
+0.02	Add process memory map (for gdb; for dbx at least under Solaris)
