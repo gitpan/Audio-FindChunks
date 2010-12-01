@@ -44,3 +44,5 @@ Revision history for Perl extension Audio::FindChunks.
 	on big-endian 64-bit machines...).
 1.03	Upgrade remote machine-code debugging to v0.01.
 1.04	Upgrade remote machine-code debugging to v0.02.
+2.00	For pointer-conversion, append ! on pack specifier for long if supported.
+	Should fix the crash on 64-bit machines.

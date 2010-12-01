@@ -31,7 +31,7 @@ cannot bind, not a tty
 Checking if your kit is complete...
 Looks good
 Writing Makefile for Audio::FindChunks
-make[1]: Entering directory `/tmp/iz/Audio-FindChunks-1.04/dbg-bld'
+make[1]: Entering directory `/tmp/Audio-FindChunks-1.04/dbg-bld'
 cp FindChunks.pm blib/lib/Audio/FindChunks.pm
 /usr/local/bin/perl /local/sol/9/depot/perl-5.8.7/lib/5.8.7/ExtUtils/xsubpp  -typemap /local/sol/9/depot/perl-5.8.7/lib/5.8.7/ExtUtils/typemap -typemap typemap  FindChunks.xs > FindChunks.xsc && mv FindChunks.xsc FindChunks.c
 cc -c  -I. -I/usr/local/include -I/opt/local/include -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -g   -DVERSION=\"1.04\" -DXS_VERSION=\"1.04\" -KPIC "-I/local/sol/9/depot/perl-5.8.7/lib/5.8.7/sun4-solaris/CORE"   FindChunks.c
@@ -44,7 +44,7 @@ chmod 755 blib/arch/auto/Audio/FindChunks/FindChunks.so
 cp FindChunks.bs blib/arch/auto/Audio/FindChunks/FindChunks.bs
 chmod 644 blib/arch/auto/Audio/FindChunks/FindChunks.bs
 Manifying blib/man3/Audio::FindChunks.3
-make[1]: Leaving directory `/tmp/iz/Audio-FindChunks-1.04/dbg-bld'
+make[1]: Leaving directory `/tmp/Audio-FindChunks-1.04/dbg-bld'
 cannot bind, not a tty
 cannot bind, not a tty
 cannot bind, not a tty
@@ -206,8 +206,8 @@ __func__ = "XS_Audio__FindChunks_le_short_sample_stats"
 7F9BC000      24K rwx--  /usr/lib/libc.so.1
 7F9C2000       8K rwx--  /usr/lib/libc.so.1
 7F9E0000       8K rwx--    [ anon ]
-7F9F0000      24K r-x--  /tmp/iz/Audio-FindChunks-1.04/dbg-bld/blib/arch/auto/Audio/FindChunks/FindChunks.so
-7FA04000       8K rwx--  /tmp/iz/Audio-FindChunks-1.04/dbg-bld/blib/arch/auto/Audio/FindChunks/FindChunks.so
+7F9F0000      24K r-x--  /tmp/Audio-FindChunks-1.04/dbg-bld/blib/arch/auto/Audio/FindChunks/FindChunks.so
+7FA04000       8K rwx--  /tmp/Audio-FindChunks-1.04/dbg-bld/blib/arch/auto/Audio/FindChunks/FindChunks.so
 7FA10000       8K r-x--  /local/sol/9/depot/perl-5.8.7/lib/5.8.7/sun4-solaris/auto/Cwd/Cwd.so
 7FA20000       8K rwx--  /local/sol/9/depot/perl-5.8.7/lib/5.8.7/sun4-solaris/auto/Cwd/Cwd.so
 7FA30000     224K r-x--  /usr/lib/libm.so.1

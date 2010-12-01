@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Audio-FindChunks
-version:            1.04
+version:            2.00
 abstract:           breaks audio files into sound/silence parts.
 author:
     - Ilya Zakharevich <cpan@ilyaz.org>

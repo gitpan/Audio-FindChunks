@@ -11,7 +11,7 @@ BEGIN {
 
   @ISA = qw(DynaLoader);
 
-  $VERSION = '1.04';
+  $VERSION = '2.00';
 
   bootstrap Audio::FindChunks $VERSION;
   my $do_dbg	   = !!$ENV{FIND_CHUNKS_DEBUG};	# Convert to logical
@@ -27,11 +27,12 @@ sub default ($$$) {my ($o, $k, $v) = @_; $o->{$k} = $v unless defined $o->{$k}}
 my $le_short_size  = length pack 'v', 0;
 my $short_size	   = length pack 's', 0;
 my $int_size	   = length pack 'i', 0;
-my $long	   = ($] >= 5.006 ? 'l!' : 'l');
+my $long_post	   = ($] >= 5.006 ? '!' : '');
+my $long	   = "l$long_post";
 my $long_size	   = length pack $long, 0;
 my $double_size    = length pack 'd', 0;
 my $pointer_size   = length pack 'p', 0;
-my $pointer_unpack = (($pointer_size == $int_size) ? 'I' : 'L');
+my $pointer_unpack = (($pointer_size == $int_size) ? 'I' : "L$long_post");
 my $long_min	   = unpack $long, pack $long, -1e100;
 my $long_max	   = -$long_min-1;
 my $do_dbg	   = $ENV{FIND_CHUNKS_DEBUG};

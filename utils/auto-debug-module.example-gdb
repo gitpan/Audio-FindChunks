@@ -19,7 +19,7 @@ t/zzz_debug-crash.....# reporting ./Makefile header:
 Checking if your kit is complete...
 Looks good
 Writing Makefile for Audio::FindChunks
-make[1]: Entering directory `/tmp/iz/Audio-FindChunks-1.04/dbg-bld'
+make[1]: Entering directory `/tmp/Audio-FindChunks-1.04/dbg-bld'
 cp FindChunks.pm blib/lib/Audio/FindChunks.pm
 /usr/bin/perl /usr/lib/perl5/5.8.8/ExtUtils/xsubpp  -typemap /usr/lib/perl5/5.8.8/ExtUtils/typemap -typemap typemap  FindChunks.xs > FindChunks.xsc && mv FindChunks.xsc FindChunks.c
 gcc -c  -I. -D_REENTRANT -D_GNU_SOURCE -fno-strict-aliasing -pipe -Wdeclaration-after-statement -I/usr/local/include -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -I/usr/include/gdbm -g   -DVERSION=\"1.04\" -DXS_VERSION=\"1.04\" -fPIC "-I/usr/lib/perl5/5.8.8/i386-linux-thread-multi/CORE"  -DNATIVE_LE_SHORTS FindChunks.c
@@ -38,7 +38,7 @@ chmod 755 blib/arch/auto/Audio/FindChunks/FindChunks.so
 cp FindChunks.bs blib/arch/auto/Audio/FindChunks/FindChunks.bs
 chmod 644 blib/arch/auto/Audio/FindChunks/FindChunks.bs
 Manifying blib/man3/Audio::FindChunks.3pm
-make[1]: Leaving directory `/tmp/iz/Audio-FindChunks-1.04/dbg-bld'
+make[1]: Leaving directory `/tmp/Audio-FindChunks-1.04/dbg-bld'
 [Thread debugging using libthread_db enabled]
 1..32
 # Running under perl version 5.008008 for linux
@@ -245,7 +245,7 @@ No symbol table info available.
 
 process 1622
 cmdline = '/usr/bin/perl'
-cwd = '/tmp/iz/Audio-FindChunks-1.04/dbg-bld'
+cwd = '/tmp/Audio-FindChunks-1.04/dbg-bld'
 exe = '/usr/bin/perl'
 Mapped address spaces:
 
@@ -271,8 +271,8 @@ Mapped address spaces:
 	  0x5f7000   0x722000   0x12b000          0     /usr/lib/perl5/5.8.8/i386-linux-thread-multi/CORE/libperl.so
 	  0x722000   0x727000     0x5000   0x12a000     /usr/lib/perl5/5.8.8/i386-linux-thread-multi/CORE/libperl.so
 	  0x727000   0x729000     0x2000   0x727000        
-	  0xa3b000   0xa40000     0x5000          0      /tmp/iz/Audio-FindChunks-1.04/dbg-bld/blib/arch/auto/Audio/FindChunks/FindChunks.so
-	  0xa40000   0xa41000     0x1000     0x4000      /tmp/iz/Audio-FindChunks-1.04/dbg-bld/blib/arch/auto/Audio/FindChunks/FindChunks.so
+	  0xa3b000   0xa40000     0x5000          0      /tmp/Audio-FindChunks-1.04/dbg-bld/blib/arch/auto/Audio/FindChunks/FindChunks.so
+	  0xa40000   0xa41000     0x1000     0x4000      /tmp/Audio-FindChunks-1.04/dbg-bld/blib/arch/auto/Audio/FindChunks/FindChunks.so
 	  0xb80000   0xb82000     0x2000          0     /usr/lib/perl5/5.8.8/i386-linux-thread-multi/auto/Cwd/Cwd.so
 	  0xb82000   0xb83000     0x1000     0x1000     /usr/lib/perl5/5.8.8/i386-linux-thread-multi/auto/Cwd/Cwd.so
 	  0xd0c000   0xd21000    0x15000          0     /lib/libnsl-2.5.so

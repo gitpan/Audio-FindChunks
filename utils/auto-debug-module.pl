@@ -155,7 +155,7 @@ for my $script (@ARGV) {
     $ver = $gdb;
     my $gdb_in = 'gdb-in';
     open TT, ">$gdb_in" or die "Can't open $gdb_in for write: $!";
-    # bt full: include local vars (not in 5.0; is in 6.5; is in 6.3, but crashes:
+    # bt full: include local vars (not in 5.0; is in 6.5; is in 6.1, but crashes on 6.3:
 	# http://www.cpantesters.org/cpan/report/2fffc390-afd2-11df-834b-ae20f5ac70d3)
     # disas /m : with source lines (FULL function?!) (not in 6.5; is in 7.0.1)
     # XXX all-registers may take 6K on amd64; maybe put at end?
